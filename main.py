@@ -1,33 +1,31 @@
 import telebot
 from telebot import types
 
-# Твой токен, который ты скинул
 TOKEN = '8693012719:AAFFRW4JMaQVmXPIIgkcVLJC-Wwe43Y4vDE'
 bot = telebot.TeleBot(TOKEN)
 
-# Данные из твоего прайса
+# Сократил ключи, чтобы Telegram ничего не обрезал
 PRICES = {
-    "express": {"name": "⚡ Экспресс-мойка", "costs": [500, 600, 700]},
+    "exp": {"name": "⚡ Экспресс-мойка", "costs": [500, 600, 700]},
     "body": {"name": "🚗 Мойка кузова", "costs": [600, 800, 1000]},
-    "two_phase": {"name": "🧼 Двух-фазная кузова", "costs": [1100, 1400, 1700]},
-    "three_phase": {"name": "✨ Трёх-фазная кузова", "costs": [1400, 1700, 2000]},
+    "2ph": {"name": "🧼 Двух-фазная кузова", "costs": [1100, 1400, 1700]},
+    "3ph": {"name": "✨ Трёх-фазная кузова", "costs": [1400, 1700, 2000]},
     "mats": {"name": "🧺 Кузов + коврики", "costs": [700, 1000, 1300]},
-    "salon": {"name": "🧽 Кузов + салон", "costs": [1500, 2000, 2500]},
-    "hard_wax": {"name": "🕯️ Твердый воск", "costs": [1500, 2000, 2500]},
+    "sal": {"name": "🧽 Кузов + салон", "costs": [1500, 2000, 2500]},
+    "wax": {"name": "🕯️ Твердый воск", "costs": [1500, 2000, 2500]},
 }
 
 ADDONS = {
-    "wax": {"name": "Обработка воском", "price": 300},
-    "quartz": {"name": "Обработка кварцем", "price": 600},
-    "bitumen": {"name": "Очистка битума (1 дет.)", "price": 200},
-    "engine": {"name": "Мойка двигателя", "price": 1500},
-    "plastic": {"name": "Полироль пластика", "price": 500},
-    "leather": {"name": "Кондиционер кожи", "price": 500},
-    "tires": {"name": "Чернение резины", "price": 300},
-    "trunk": {"name": "Уборка багажника", "price": 500},
+    "add_wx": {"name": "Обработка воском", "price": 300},
+    "add_qz": {"name": "Обработка кварцем", "price": 600},
+    "add_bt": {"name": "Очистка битума (1 дет.)", "price": 200},
+    "add_eg": {"name": "Мойка двигателя", "price": 1500},
+    "add_pl": {"name": "Полироль пластика", "price": 500},
+    "add_lt": {"name": "Кондиционер кожи", "price": 500},
+    "add_tr": {"name": "Чернение резины", "price": 300},
+    "add_tk": {"name": "Уборка багажника", "price": 500},
 }
 
-# Временное хранение заказов пользователей
 user_orders = {}
 
 @bot.message_handler(commands=['start', 'reset'])
@@ -36,13 +34,13 @@ def send_welcome(message):
     
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("🚗 Легковая", callback_data="type_0"),
-        types.InlineKeyboardButton("🚙 Кроссовер / Паркетник", callback_data="type_1"),
-        types.InlineKeyboardButton("🚐 Минивэн / Микроавтобус", callback_data="type_2")
+        types.InlineKeyboardButton("🚗 Легковая", callback_data="t_0"),
+        types.InlineKeyboardButton("🚙 Кроссовер / Паркетник", callback_data="t_1"),
+        types.InlineKeyboardButton("🚐 Минивэн / Микроавтобус", callback_data="t_2")
     )
     bot.send_message(message.chat.id, "👋 Привет! Выбери тип автомобиля для расчета:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("type_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("t_"))
 def handle_type(call):
     type_idx = int(call.data.split("_")[1])
     user_orders[call.message.chat.id]["type_idx"] = type_idx
@@ -52,12 +50,12 @@ def handle_type(call):
     markup = types.InlineKeyboardMarkup(row_width=1)
     for key, item in PRICES.items():
         price = item["costs"][type_idx]
-        markup.add(types.InlineKeyboardButton(f"{item['name']} — {price}₽", callback_data=f"main_{key}"))
+        markup.add(types.InlineKeyboardButton(f"{item['name']} — {price}₽", callback_data=f"m_{key}"))
         
     bot.edit_message_text(f"Выбран тип: *{types_names[type_idx]}*\nТеперь выбери основную услугу:", 
                           call.message.chat.id, call.message.message_id, parse_mode="Markdown", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("main_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("m_"))
 def handle_main_service(call):
     service_key = call.data.split("_")[1]
     user_orders[call.message.chat.id]["main_service"] = service_key
@@ -69,7 +67,6 @@ def show_addons_menu(message, chat_id, message_id=None):
     type_idx = order["type_idx"]
     main_service = PRICES[order["main_service"]]
     
-    # Считаем текущую сумму
     total = main_service["costs"][type_idx]
     text_addons = ""
     
@@ -87,23 +84,20 @@ def show_addons_menu(message, chat_id, message_id=None):
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     
-    # Кнопки допов
     buttons = []
     for key, item in ADDONS.items():
         status = "✅ " if key in order["addons"] else ""
-        buttons.append(types.InlineKeyboardButton(f"{status}{item['name']} ({item['price']}₽)", callback_data=f"addon_{key}"))
+        buttons.append(types.InlineKeyboardButton(f"{status}{item['name']} ({item['price']}₽)", callback_data=f"a_{key}"))
         
     markup.add(*buttons)
     markup.add(types.InlineKeyboardButton("🏁 ГОТОВО / СБРОС", callback_data="finish"))
     
-    if message_id:
-        bot.edit_message_text(text, chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
-    else:
-        bot.edit_message_text(text, chat_id, message.message_id, parse_mode="Markdown", reply_markup=markup)
+    target_msg_id = message_id if message_id else message.id
+    bot.edit_message_text(text, chat_id, target_msg_id, parse_mode="Markdown", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("addon_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("a_"))
 def handle_addons(call):
-    addon_key = call.data.split("_")[1]
+    addon_key = call.data.split("a_")[1]
     chat_id = call.message.chat.id
     
     if addon_key in user_orders[chat_id]["addons"]:
@@ -111,7 +105,7 @@ def handle_addons(call):
     else:
         user_orders[chat_id]["addons"].append(addon_key)
         
-    show_addons_menu(call.message, chat_id, call.message.message_id)
+    show_addons_menu(call.message, chat_id, call.message.id)
 
 @bot.callback_query_handler(func=lambda call: call.data == "finish")
 def handle_finish(call):
